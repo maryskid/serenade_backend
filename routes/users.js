@@ -23,12 +23,12 @@ router.post("/signup", async (req, res) => {
       birthdate,
       location,
       imaginaryName,
-    } = req.body;
+    } = JSON.parse(req.body.userInfos);
 
     // we use express-fileupload (imported in App.js) to access the files passed in the request body
-    //We also use the nullish coalescing operator (??) to assign an empty object to the pictures variable if req.files is null or undefined.
+    //We also use the nullish coalescing operator (??) to assign an empty array to the pictures variable if req.files is null or undefined.
     //This prevents errors when accessing pictures later in the code.
-    const { pictures } = req.files ?? {};
+    const pictures = req.files?.userPictures ?? [];
 
     // we use the checkBody function from the utils folder to check if all the fields we need are filled in
     if (
