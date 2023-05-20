@@ -1,116 +1,94 @@
 var express = require("express");
 var router = express.Router();
 const User = require("../models/User");
-const checkBody = require("../utils/checkBody");
+const checkBody = require("../modules/checkBody");
+const {
+  isAnArrayOfPictures,
+  validatePictureFormats,
+} = require("../modules/validatePictures");
 const uid2 = require("uid2");
 const bcrypt = require("bcrypt");
-const uniqid = require("uniqid");
-const { uploadPictures } = require("../utils/cloudinary");
-const fs = require("fs");
+const { uploadUserPictures } = require("../modules/cloudinary");
 
 router.post("/signup", async (req, res) => {
-  // we use destructuring to get the values from the request body
-  const {
-    email,
-    name,
-    password,
-    gender,
-    sexuality,
-    relationshipStatus,
-    birthdate,
-    location,
-    imaginaryName,
-  } = req.body;
-
-  // we use express-fileupload (imported in App.js) to access the files passed in the request body
-
-  // we use  the nullish coalescing operator (??) to ensure that even if req.files is null or undefined,
-  //the pictures variable will be assigned an empty object as its default value, avoiding potential
-  //errors when accessing pictures later in our code
-  const { pictures } = req.files ?? {};
-
-  // we use the checkBody function from the utils folder to check if all the fields we need are filled in
-  if (
-    !checkBody(
-      {
-        email,
-        name,
-        password,
-        imaginaryName,
-      },
-      ["email", "name", "password", "imaginaryName"]
-    )
-  ) {
-    return res.status(400).json({
-      result: false,
-      message: "Please fill in all fields",
-    });
-  }
-
-  // Here is a types of files that we accept
-  const fileTypes = ["image/jpeg", "image/png", "image/jpg"];
-
-  // if we don't have any file  we respond with an error message
-  if (!Array.isArray(pictures) || pictures.length === 0) {
-    return res
-      .status(400)
-      .json({ result: false, message: "Please upload at least 2 pictures" });
-  }
-
-  // if we have got a file that isn't an image we respond with an error message
-  if (!pictures.every((picture) => fileTypes.includes(picture.mimetype))) {
-    return res.status(400).json({
-      result: false,
-      message: "Image formats supported: JPG, PNG, JPEG",
-    });
-  }
-
-  // Check if a user with the same email already exists
-  const userAlreadyExists = await User.findOne({
-    email: { $regex: new RegExp(`^${email}$`, "i") },
-  });
-  if (userAlreadyExists) {
-    return res.status(400).json({
-      result: false,
-      message: "User already exists",
-    });
-  }
-
-  //Check if a user with the same imaginaryName already exists
-  const imaginaryNameIsTaken = await User.findOne({
-    imaginaryName: { $regex: new RegExp(`^${imaginaryName}$`, "i") },
-  });
-  if (imaginaryNameIsTaken) {
-    return res.status(400).json({
-      result: false,
-      message: "Imaginary name already exists",
-    });
-  }
-
-  // we declare an empty array to store the cloudinary urls
-  let userPictures = [];
-
   try {
-    //We loop through the pictures array and move each to cloudinary
-    // Because it's a loop and all this operations are asynchronous we use **await Promise.all** to wait until all the operations are complete
-    await Promise.all(
-      pictures.map(async (picture) => {
-        //we move the picture to a tmp folder and give it a unique name
-        const photoPath = `./tmp/${uniqid()}.jpg`;
-        await picture.mv(photoPath);
+    // we use destructuring to get the values from the request body
+    const {
+      email,
+      name,
+      password,
+      gender,
+      sexuality,
+      relationshipStatus,
+      birthdate,
+      location,
+      imaginaryName,
+    } = req.body;
 
-        //we upload the picture to cloudinary through the cloudinary module from the utils folder
-        const cloudFiles = await uploadPictures(photoPath);
+    // we use express-fileupload (imported in App.js) to access the files passed in the request body
+    //We also use the nullish coalescing operator (??) to assign an empty object to the pictures variable if req.files is null or undefined.
+    //This prevents errors when accessing pictures later in the code.
+    const { pictures } = req.files ?? {};
 
-        //we delete the photo from the tmp folder
-        fs.unlinkSync(photoPath);
+    // we use the checkBody function from the utils folder to check if all the fields we need are filled in
+    if (
+      !checkBody(
+        {
+          email,
+          name,
+          password,
+          imaginaryName,
+        },
+        ["email", "name", "password", "imaginaryName"]
+      )
+    ) {
+      return res.status(400).json({
+        result: false,
+        message: "Please fill in all fields",
+      });
+    }
 
-        //We push the cloudinary url to the pictures array every time we upload a picture
-        userPictures.push(cloudFiles.secure_url);
-      })
-    );
+    // if we don't have any file  we respond with an error message
+    if (!isAnArrayOfPictures(pictures)) {
+      return res.status(400).json({
+        result: false,
+        message: "Please upload at least 2 pictures",
+      });
+    }
+
+    // if we have got some files that wasn't image file we respond with an error message
+    if (!validatePictureFormats(pictures)) {
+      return res.status(400).json({
+        result: false,
+        message: "Image formats supported: JPG, PNG, JPEG",
+      });
+    }
+
+    // Check if a user with the same email already exists
+    const userAlreadyExists = await User.findOne({
+      email: { $regex: new RegExp(`^${email}$`, "i") },
+    });
+    if (userAlreadyExists) {
+      return res.status(400).json({
+        result: false,
+        message: "User already exists",
+      });
+    }
+
+    //Check if a user with the same imaginaryName already exists
+    const imaginaryNameIsTaken = await User.findOne({
+      imaginaryName: { $regex: new RegExp(`^${imaginaryName}$`, "i") },
+    });
+    if (imaginaryNameIsTaken) {
+      return res.status(400).json({
+        result: false,
+        message: "Imaginary name already exists",
+      });
+    }
+
     // We respond with an error message if no pictures were processed
-    if (userPictures.length === 0) {
+    const userPicturesUrls = await uploadUserPictures(pictures);
+    if (!userPicturesUrls) {
       res
         .status(400)
         .json({ result: false, message: "No pictures were uploaded" });
@@ -129,7 +107,7 @@ router.post("/signup", async (req, res) => {
       relationshipStatus,
       birthdate,
       location,
-      pictures: userPictures,
+      pictures: userPicturesUrls,
       imaginaryName,
       token: uid2(32),
     });
@@ -143,6 +121,8 @@ router.post("/signup", async (req, res) => {
 
 router.post("/signin", async (req, res) => {
   const { email, password } = req.body;
+
+  // we use the checkBody module to check if all the fields we need are filled in
   if (!checkBody({ email, password }, ["email", "password"])) {
     return res
       .status(400)
