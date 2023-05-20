@@ -11,7 +11,9 @@ var usersRouter = require("./routes/users");
 
 var app = express();
 var cors = require("cors");
+var fileUpload = require("express-fileupload");
 
+app.use(fileUpload());
 app.use(cors());
 app.use(logger("dev"));
 app.use(express.json());
