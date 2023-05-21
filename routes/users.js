@@ -6,6 +6,7 @@ const uid2 = require("uid2");
 const bcrypt = require("bcrypt");
 
 router.post("/signup", async (req, res) => {
+  console.log("marcel")
   const {
     email,
     name,
