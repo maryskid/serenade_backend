@@ -12,6 +12,13 @@ const { uploadUserPictures } = require("../modules/cloudinary");
 
 router.post("/signup", async (req, res) => {
   try {
+    // Check if req.body is empty
+    if (!req.body) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Missing user information" });
+    }
+
     // we use destructuring to get the values from the request body
     const {
       email,
@@ -23,12 +30,7 @@ router.post("/signup", async (req, res) => {
       birthdate,
       location,
       imaginaryName,
-    } = JSON.parse(req.body.userInfos);
-
-    // we use express-fileupload (imported in App.js) to access the files passed in the request body
-    //We also use the nullish coalescing operator (??) to assign an empty array to the pictures variable if req.files is null or undefined.
-    //This prevents errors when accessing pictures later in the code.
-    const pictures = req.files?.userPictures ?? [];
+    } = req.body;
 
     // we use the checkBody function from the utils folder to check if all the fields we need are filled in
     if (
@@ -45,22 +47,6 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({
         result: false,
         message: "Please fill in all fields",
-      });
-    }
-
-    // if we don't have any file  we respond with an error message
-    if (!isAnArrayOfPictures(pictures)) {
-      return res.status(400).json({
-        result: false,
-        message: "Please upload at least 2 pictures",
-      });
-    }
-
-    // if we have got some files that wasn't image file we respond with an error message
-    if (!validatePictureFormats(pictures)) {
-      return res.status(400).json({
-        result: false,
-        message: "Image formats supported: JPG, PNG, JPEG",
       });
     }
 
@@ -86,14 +72,6 @@ router.post("/signup", async (req, res) => {
       });
     }
 
-    // We respond with an error message if no pictures were processed
-    const userPicturesUrls = await uploadUserPictures(pictures);
-    if (!userPicturesUrls) {
-      res
-        .status(400)
-        .json({ result: false, message: "No pictures were uploaded" });
-    }
-
     // We cryptographically hash the password using bcrypt
     const hashedPassword = bcrypt.hashSync(password, 10);
 
@@ -107,13 +85,20 @@ router.post("/signup", async (req, res) => {
       relationshipStatus,
       birthdate,
       location,
-      pictures: userPicturesUrls,
       imaginaryName,
       token: uid2(32),
     });
 
     const savedUser = await newUser.save();
-    return res.status(200).json({ result: true, user: savedUser.token });
+
+    //To exclude the _id property from the user object our response,
+    //we use the .toObject() method provided by Mongoose.
+    const userWithoutId = savedUser.toObject();
+    delete userWithoutId._id;
+
+    return res
+      .status(200)
+      .json({ result: true, userToken: savedUser.token, user: userWithoutId });
   } catch (error) {
     res.status(500).json({ result: false, message: error.message });
   }
@@ -142,8 +127,78 @@ router.post("/signin", async (req, res) => {
     }
 
     if (bcrypt.compareSync(password, user.password)) {
-      return res.status(200).json({ result: true, user: user.token });
+      //To exclude the _id property from the user object our response,
+      //we use the .toObject() method provided by Mongoose.
+      const userWithoutId = user.toObject();
+      delete userWithoutId._id;
+      return res
+        .status(200)
+        .json({ result: true, userToken: user.token, user: userWithoutId });
     }
+  } catch (error) {
+    res.status(500).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/uploadPictures", async (req, res) => {
+  try {
+    if (!req.body?.userToken) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Missing user token" });
+    }
+    // Check if req.files.userPictures exists
+    if (!req.files?.userPictures) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Missing user pictures" });
+    }
+
+    //Acces the user token from the request body and parse it to retrieve a string
+    const userToken = JSON.parse(req.body.userToken);
+
+    // we find the user in the database and return an error message if the user doesn't exist
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+
+    // we use express-fileupload (imported in App.js) to access the files passed in the request body in our frontend
+    const userPictures = req.files.userPictures;
+
+    // if we don't have at least 2 pictures we respond with an error message
+    if (!isAnArrayOfPictures(userPictures)) {
+      return res.status(400).json({
+        result: false,
+        message: "Please upload at least 2 pictures",
+      });
+    }
+
+    // if we have got some files that wasn't image file we respond with an error message
+    if (!validatePictureFormats(userPictures)) {
+      return res.status(400).json({
+        result: false,
+        message: "Image formats supported: JPG, PNG, JPEG",
+      });
+    }
+
+    // We use our cloudinary module modules/cloudinary.js
+    //to upload the user pictures to cloudinary and get the urls of the uploaded pictures
+    const userPicturesUrls = await uploadUserPictures(userPictures);
+
+    //if an error occurs during this process we respond with an error message
+    if (!userPicturesUrls) {
+      return res
+        .status(400)
+        .json({ result: false, message: "No pictures were uploaded" });
+    }
+
+    // otherwise we update the user pictures with those urls from cloudinary
+    user.pictures = userPicturesUrls;
+
+    // and finally update our user document in database
+    await user.save();
+    return res.status(200).json({ result: true, message: "Pictures uploaded" });
   } catch (error) {
     res.status(500).json({ result: false, message: error.message });
   }

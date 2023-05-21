@@ -15,7 +15,7 @@ cloudinary.config({
 const uploadFile = async (file) => {
   const image = await cloudinary.uploader.upload(
     file,
-    { folder: "Seranade" },
+    { folder: "Serenade" },
     (result) => result
   );
   return image;

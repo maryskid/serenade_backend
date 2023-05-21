@@ -4,7 +4,7 @@ const goodPicturesFormats = ["image/jpeg", "image/png", "image/jpg"];
 // Validates the uploaded pictures
 const isAnArrayOfPictures = (pictures) => {
   // if pictures is not an array of at least 2 files we return false
-  if (!Array.isArray(pictures) || pictures.length === 0) {
+  if (!Array.isArray(pictures) || pictures.length < 2) {
     return false;
   }
   return true;
