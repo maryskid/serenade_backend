@@ -90,15 +90,7 @@ router.post("/signup", async (req, res) => {
     });
 
     const savedUser = await newUser.save();
-
-    //To exclude the _id property from the user object our response,
-    //we use the .toObject() method provided by Mongoose.
-    const userWithoutId = savedUser.toObject();
-    delete userWithoutId._id;
-
-    return res
-      .status(200)
-      .json({ result: true, userToken: savedUser.token, user: userWithoutId });
+    return res.status(200).json({ result: true, userToken: savedUser.token });
   } catch (error) {
     res.status(500).json({ result: false, message: error.message });
   }
@@ -127,13 +119,7 @@ router.post("/signin", async (req, res) => {
     }
 
     if (bcrypt.compareSync(password, user.password)) {
-      //To exclude the _id property from the user object our response,
-      //we use the .toObject() method provided by Mongoose.
-      const userWithoutId = user.toObject();
-      delete userWithoutId._id;
-      return res
-        .status(200)
-        .json({ result: true, userToken: user.token, user: userWithoutId });
+      return res.status(200).json({ result: true, userToken: user.token });
     }
   } catch (error) {
     res.status(500).json({ result: false, message: error.message });
