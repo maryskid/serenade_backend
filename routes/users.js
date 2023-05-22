@@ -316,8 +316,7 @@ router.get("/displayOne/:token", async (req, res) => {
     
     // Find the user with the token and select the specific fields
     const user = await User.findOne({ token })
-      .select("gender name sexuality pictures birthdate location description occupation myRelationships")
-      .populate("profile");
+      .select("gender name sexuality relationshipStatus pictures birthdate location description occupation myRelationships")
     
     // Check if user exists
     if (!user) {
