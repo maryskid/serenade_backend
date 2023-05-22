@@ -2,6 +2,20 @@ var express = require("express");
 var router = express.Router();
 const User = require("../models/User");
 
+// const calculateAge = (dateOfBirth) => {
+//   const today = new Date();
+//   const birthDate = new Date(dateOfBirth);
+
+//   let age = today.getFullYear() - birthDate.getFullYear();
+//   const monthDiff = today.getMonth() - birthDate.getMonth();
+
+//   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+//     age--;
+//   }
+
+//   return age;
+// };
+
 function filterByAgeAndDistance(persons, ageMin, ageMax, latitude, longitude, maxDistance) {
   const now = new Date();
   const thisYear = now.getFullYear();
@@ -62,13 +76,24 @@ router.post('/propositions', (req, res) => {
       search.ageMax, 
       connectedPerson.location.latitude, 
       connectedPerson.location.longitude, 
-      search.maxDistance);
+      search.maxDistance
+    );
 
-    res.json({
-      nb: result.length, result: result });
-  });
+    // const resultWithAge = result.map(obj => {
+    //   const age = calculateAge(obj.birthdate);
+    //   return { ...obj, age };
+    // });
+    
+    res.json({nb: resultWithAge.length, result: resultWithAge });
+    })
+
+    // dbData.forEach(obj => {
+    //   o;
+    //   console.log(obj.age)
+    // });
+  })
+
 });
-})
 
 module.exports = router;
 
