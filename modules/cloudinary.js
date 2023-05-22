@@ -13,12 +13,17 @@ cloudinary.config({
 
 //How to upload a file to cloudinary, see cloudinary documentation
 const uploadFile = async (file) => {
-  const image = await cloudinary.uploader.upload(
-    file,
-    { folder: "Serenade" },
-    (result) => result
-  );
-  return image;
+  try {
+    const image = await cloudinary.uploader.upload(file, {
+      resource_type: "image",
+      quality: "auto",
+      fetch_format: "auto",
+      folder: "Serenade",
+    });
+    return image;
+  } catch (error) {
+    return { message: "Error when uploading image" };
+  }
 };
 
 // our custom function to upload pictures of our users to cloudinary
