@@ -2,20 +2,6 @@ var express = require("express");
 var router = express.Router();
 const User = require("../models/User");
 
-// const calculateAge = (dateOfBirth) => {
-//   const today = new Date();
-//   const birthDate = new Date(dateOfBirth);
-
-//   let age = today.getFullYear() - birthDate.getFullYear();
-//   const monthDiff = today.getMonth() - birthDate.getMonth();
-
-//   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-//     age--;
-//   }
-
-//   return age;
-// };
-
 function filterByAgeAndDistance(persons, ageMin, ageMax, latitude, longitude, maxDistance) {
   const now = new Date();
   const thisYear = now.getFullYear();
@@ -26,7 +12,8 @@ function filterByAgeAndDistance(persons, ageMin, ageMax, latitude, longitude, ma
     const birthdate = new Date(person.birthdate);
     const birthYear = birthdate.getFullYear();
     const age = thisYear - birthYear;
-    if (age < ageMin || age > ageMax) {
+
+    if ((ageMin !== null && age < ageMin) || (ageMax !== null && age > ageMax)) {
       return false;
     }
 
@@ -48,7 +35,11 @@ function filterByAgeAndDistance(persons, ageMin, ageMax, latitude, longitude, ma
 
     const distance = RAYON_TERRE * c;
 
-    return distance <= maxDistance;
+    if (maxDistance !== null && distance > maxDistance) {
+      return false;
+    }
+
+    return true;
   });
 }
 
@@ -60,39 +51,52 @@ router.post('/propositions', (req, res) => {
   })
   .then(connectedPerson => {
 
-    const search = connectedPerson.search
+    const search = connectedPerson.search;
 
-  console.log(search)
-  User.find({
-    gender: search.genderLiked,    
-    sexuality: search.sexualityLiked,
-    
+    if (!search) {
+      // "search" n'existe pas
+      // Récupérer toutes les données sans filtrer sur la condition de "search"
+      User.find({})
+        .then(dbData => {
+          res.json({ nb: dbData.length, result: dbData });
+        })
+        .catch(error => {
+          res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des données.' });
+        });
+    } else {
+      const filter = {};
+
+      if (search.genderLiked) {
+        filter.gender = search.genderLiked;
+      }
+
+      if (search.sexualityLiked) {
+        filter.sexuality = search.sexualityLiked;
+      }
+
+      User.find(filter)
+        .then(dbData => {
+
+          const result = filterByAgeAndDistance(
+            dbData, 
+            search.ageMin, 
+            search.ageMax, 
+            connectedPerson.location.latitude, 
+            connectedPerson.location.longitude, 
+            search.maxDistance
+          );
+
+          res.json({ nb: result.length, result: result });
+        })
+        .catch(error => {
+          res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des données.' });
+        });
+    }
+
   })
-  .then(dbData => {
-
-    const result = filterByAgeAndDistance(
-      dbData, 
-      search.ageMin, 
-      search.ageMax, 
-      connectedPerson.location.latitude, 
-      connectedPerson.location.longitude, 
-      search.maxDistance
-    );
-
-    // const resultWithAge = result.map(obj => {
-    //   const age = calculateAge(obj.birthdate);
-    //   return { ...obj, age };
-    // });
-    
-    res.json({nb: resultWithAge.length, result: resultWithAge });
-    })
-
-    // dbData.forEach(obj => {
-    //   o;
-    //   console.log(obj.age)
-    // });
-  })
-
+  .catch(error => {
+    res.status(500).json({ error: 'Une erreur est survenue lors de la recherche de l\'utilisateur.' });
+  });
 });
 
 module.exports = router;
