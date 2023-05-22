@@ -305,4 +305,30 @@ router.post("/partners", async (req, res) => {
   }
 });
 
+router.get("/displayOne/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    // Verify token exists
+    if (!token) {
+      return res.status(400).json({ result: false, message: "Missing token" });
+    }
+    
+    // Find the user with the token and select the specific fields
+    const user = await User.findOne({ token })
+      .select("gender name sexuality pictures birthdate location description occupation myRelationships")
+      .populate("profile");
+    
+    // Check if user exists
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+  
+    return res.status(200).json({ result: true, message: "User found", user });
+  } catch (error) {
+    res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+
 module.exports = router;
