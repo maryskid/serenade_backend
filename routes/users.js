@@ -9,6 +9,7 @@ const {
 const uid2 = require("uid2");
 const bcrypt = require("bcrypt");
 const { uploadUserPictures } = require("../modules/cloudinary");
+const Match = require("../models/Match");
 
 router.post("/signup", async (req, res) => {
   try {
@@ -302,6 +303,150 @@ router.post("/partners", async (req, res) => {
     return res.status(200).json({ result: true, userPartners });
   } catch (error) {
     res.status(500).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/action/like", async (req, res) => {
+  try {
+    const { userToken, likedUserToken } = req.body;
+
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+    const likedUser = await User.findOne({ token: likedUserToken });
+
+    if (!likedUser) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Liked user not found" });
+    }
+
+    const updateUserLikes = await User.updateOne(
+      { _id: user._id },
+      { $addToSet: { myLikes: likedUser._id } }
+    );
+
+    const updateLikedUserWhoLikesMe = await User.updateOne(
+      { _id: likedUser._id },
+      { $addToSet: { whoLikesMe: user._id } }
+    );
+
+    if (
+      updateUserLikes.modifiedCount !== 1 ||
+      updateLikedUserWhoLikesMe.modifiedCount !== 1
+    ) {
+      return res.status(400).json({
+        result: false,
+        message: "Error in the like action",
+      });
+    }
+
+    if (user.whoLikesMe.includes(likedUser._id)) {
+      const newMatch = new Match({
+        user: {
+          id: user._id,
+          name: user.name,
+          pictures: user.pictures,
+          token: user.token,
+        },
+        userLiked: {
+          id: likedUser._id,
+          name: likedUser.name,
+          pictures: likedUser.pictures,
+          token: likedUser.token,
+        },
+      });
+
+      const matchData = await newMatch.save();
+
+      return res.status(200).json({ isAMatch: true, matchData });
+    }
+
+    return res.status(200).json({ result: true, message: "Like done" });
+  } catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/action/dislike", async (req, res) => {
+  try {
+    const { userToken, dislikedUserToken } = req.body;
+
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+    const dislikedUser = await User.findOne({ token: dislikedUserToken });
+
+    if (!dislikedUser) {
+      return res
+        .status(400)
+        .json({ result: false, message: "DisLiked user not found" });
+    }
+
+    const updateUserDislikes = await User.updateOne(
+      { _id: user._id },
+      { $addToSet: { myDislikes: dislikedUser._id } }
+    );
+
+    if (updateUserDislikes.modifiedCount !== 1) {
+      return res.status(400).json({
+        result: false,
+        message: "Error in the dislike action",
+      });
+    }
+
+    return res.status(200).json({ result: true, message: "Dislike done" });
+  } catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/action/dismatch", async (req, res) => {
+  try {
+    const { userToken, dismatchedUserToken, matchId } = req.body;
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+    const dismatchedUser = await User.findOne({ token: dismatchedUserToken });
+    if (!dismatchedUser) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Dismatched user not found" });
+    }
+    const match = await Match.findById(matchId);
+
+    if (!match) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Match not found" });
+    }
+
+    const updateUserLikes = await User.updateOne(
+      { _id: user._id },
+      { $pull: { myLikes: dismatchedUser._id } }
+    );
+    const updateDismatchedUserWhoLikesMe = await User.updateOne(
+      { _id: dismatchedUser._id },
+      { $pull: { whoLikesMe: user._id } }
+    );
+    const deleteMatch = await Match.deleteOne({ _id: matchId });
+    if (
+      updateUserLikes.modifiedCount !== 1 ||
+      updateDismatchedUserWhoLikesMe.modifiedCount !== 1 ||
+      deleteMatch.deletedCount !== 1
+    ) {
+      return res.status(400).json({
+        result: false,
+        message: "Error in the dismatch action",
+      });
+    }
+
+    return res.status(200).json({ result: true, message: "Dismatch done" });
+  } catch (error) {
+    res.status(400).json({ result: false, message: error.message });
   }
 });
 
