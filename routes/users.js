@@ -330,5 +330,41 @@ router.get("/displayOne/:token", async (req, res) => {
   }
 });
 
+router.put("/displaySetting/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const updateFields = {
+      gender: req.body.gender,
+      sexuality: req.body.sexuality,
+      pictures: req.body.pictures,
+      birthdate: req.body.birthdate,
+      description: req.body.description,
+      occupation: req.body.occupation
+    };
+
+    // Verify token exists
+    if (!token) {
+      return res.status(400).json({ result: false, message: "Missing token" });
+    }
+
+    // Modify user information from the token
+    const updatedUser = await User.findOneAndUpdate({ token }, updateFields, {
+      new: true, // Return the modified user
+      select: "gender sexuality pictures birthdate description occupation"
+    });
+
+    // Check if user exists
+    if (!updatedUser) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+
+    return res.status(200).json({ result: true, message: "Your profile has been successfully modified", user: updatedUser });
+  } 
+  catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+
 
 module.exports = router;
