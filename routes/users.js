@@ -450,4 +450,30 @@ router.post("/action/dismatch", async (req, res) => {
   }
 });
 
+router.post("/displayProfile", async (req, res) => {
+  try {
+    const { token } = req.body;
+    // Verify token exists
+    if (!token) {
+      return res.status(400).json({ result: false, message: "Missing token" });
+    }
+
+    //find user by token and populate people who likes him/her and their partners
+    const user = await User.findOne({ token: token })
+      .populate({
+        path: "whoLikesMe myRelationships",
+        select: "-_id name location pictures birthdate gender token",
+      })
+      .select("-_id -password -myLikes -myDislikes");
+
+    // Check if user exists
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+    return res.status(200).json({ result: true, user });
+  } catch (error) {
+    return res.status(500).json({ result: false, message: error.message });
+  }
+});
+
 module.exports = router;
