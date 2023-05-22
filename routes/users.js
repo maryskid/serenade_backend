@@ -452,14 +452,14 @@ router.post("/action/dismatch", async (req, res) => {
 
 router.post("/displayProfile", async (req, res) => {
   try {
-    const { token } = req.body;
+    const { userToken } = req.body;
     // Verify token exists
-    if (!token) {
+    if (!userToken) {
       return res.status(400).json({ result: false, message: "Missing token" });
     }
 
     //find user by token and populate people who likes him/her and their partners
-    const user = await User.findOne({ token: token })
+    const user = await User.findOne({ token: userToken })
       .populate({
         path: "whoLikesMe myRelationships",
         select: "-_id name location pictures birthdate gender token",
