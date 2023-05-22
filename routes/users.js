@@ -246,7 +246,6 @@ router.post("/partner/add", async (req, res) => {
 
 router.post("/partner/remove", async (req, res) => {
   try {
-    console.log(req.body);
     const { userToken, partnerImaginaryName } = req.body;
     const user = await User.findOne({ token: userToken });
     if (!user) {
@@ -263,7 +262,7 @@ router.post("/partner/remove", async (req, res) => {
     const partnerIndex = user.myRelationships.indexOf(userPartner._id);
 
     if (partnerIndex === -1) {
-      return res.json({
+      return res.status(400).json({
         result: false,
         message: "Non existing partner cannot be removed",
       });
@@ -293,6 +292,7 @@ router.post("/partners", async (req, res) => {
     }
 
     const userPartners = user.myRelationships;
+
     if (userPartners.length === 0) {
       return res
         .status(400)
