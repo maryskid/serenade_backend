@@ -16,9 +16,11 @@ router.get('/wholikesme', async (req, res) => {
       }
   
       // Recherche tous les utilisateurs qui ont aimé l'utilisateur 
-      const usersWhoLikeMe = await User.find({ whoLikesMe: user._id });
+      const usersWhoLikeMe = await User.find({ whoLikesMe: user});
+
+
   
-      res.json({ result: true, data: usersWhoLikeMe[0].whoLikesMe });
+      res.json({ result: true, data: usersWhoLikeMe});
     } catch (error) {
       return res.status(400).json({ result: false, message: error.message });
     }
