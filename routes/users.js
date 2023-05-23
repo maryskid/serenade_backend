@@ -582,13 +582,11 @@ router.post("/recommandations", async (req, res) => {
     const allUsers = await User.find(
       {},
       {
-        myLikes: 1,
-        myDislikes: 1,
-        "location.latitude": 1,
-        "location.longitude": 1,
-        birthdate: 1,
-        gender: 1,
-        sexuality: 1,
+        password: 0,
+        myLikes: 0,
+        myDislikes: 0,
+        whoLikesMe: 0,
+        imaginaryName: 0,
       }
     );
 
@@ -599,9 +597,19 @@ router.post("/recommandations", async (req, res) => {
     // Filter users based on likes and dislikes of our user
     const firstFilteredUsers = allUsers.filter((people) => {
       return (
-        !userLikes.includes(people._id) && !userDislikes.includes(people._id)
+        !userLikes.includes(people._id) &&
+        !userDislikes.includes(people._id) &&
+        people.token !== userToken
       );
     });
+
+    if (!user.search) {
+      return res.status(200).json({
+        result: true,
+        total: firstFilteredUsers.length,
+        recommendedUsers: firstFilteredUsers,
+      });
+    }
 
     // Get user's location coordinates
     const userCoordinates = {
@@ -637,7 +645,11 @@ router.post("/recommandations", async (req, res) => {
 
     return res
       .status(200)
-      .json({ result: true, recommendedUsers: userRecommandations });
+      .json({
+        result: true,
+        total: userRecommandations.length,
+        recommendedUsers: userRecommandations,
+      });
   } catch (error) {
     return res.status(500).json({ result: false, message: error.message });
   }
