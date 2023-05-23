@@ -523,4 +523,49 @@ router.post("/updateProfile", async (req, res) => {
   }
 });
 
+router.put("/saveSearchSettings", (req, res) => {
+  // Récupération des données du front sous cette forme :
+  // {
+  //   "search" :
+  //   {
+  //   "maxDistance":50,
+  //   "ageMin":30,
+  //   "ageMax":50,
+  //   "genderLiked":"Woman",
+  //   "sexualityLiked": "Straight"
+  // },
+  // "location":
+  // {
+  //   "city" : "Taverny",
+  //   "latitude": 49.0254200,
+  //   "longitude": 2.2169100
+  // },
+  // "userToken": "Xk7H4OJZKxWj6QGcRjAs9tBvMFQ0P3N2"
+  // }
+
+  const userToken = req.body.userToken;
+
+  const updateFields = {};
+  if (req.body.search) {
+    updateFields.search = req.body.search;
+  }
+  if (req.body.location) {
+    updateFields.location = req.body.location;
+  }
+
+  User.findOneAndUpdate({ token: userToken }, updateFields, { new: true })
+    .then((updatedUser) => {
+      if (updatedUser) {
+        return res.status(200).json({ result: true, user: updatedUser });
+      } else {
+        return res
+          .status(404)
+          .json({ result: false, message: "User not found." });
+      }
+    })
+    .catch((error) => {
+      return res.status(500).json({ result: false, message: error.message });
+    });
+});
+
 module.exports = router;
