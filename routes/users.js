@@ -627,11 +627,11 @@ router.post("/recommandations", async (req, res) => {
       );
 
       return (
-        peopleAge > user.search.ageMin &&
-        peopleAge < user.search.ageMax &&
-        distanceBetweenOurTwoUsersInKm < user.search.maxDistance &&
-        people.gender === user.search.genderLiked &&
-        people.sexuality === user.search.sexualityLiked
+        peopleAge > user.search?.ageMin &&
+        peopleAge < user.search?.ageMax &&
+        distanceBetweenOurTwoUsersInKm < user.search?.maxDistance &&
+        people.gender === user.search?.genderLiked &&
+        people.sexuality === user.search?.sexualityLiked
       );
     });
 
