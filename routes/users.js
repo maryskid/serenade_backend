@@ -476,4 +476,37 @@ router.post("/displayProfile", async (req, res) => {
   }
 });
 
+router.post("/displayMessages", async (req, res) => {
+  try {
+      const { userToken } = req.body;
+      // Verify token exists
+      if (!userToken) {
+        return res.status(400).json({ result: false, message: "Missing token" });
+      }
+      
+      //find user by token and populate messages with people who matches him/her
+      const user = await User.findOne({ token: userToken })
+        // retrieve messages associated with the user
+      const matches = await Match.find({ user: {id: user._id }})
+        .populate({
+          path: "myMessages",
+          populate: {
+            path: "user",
+            select: "-_id name pictures token content date",
+          },
+        })
+        // get the details of the user you had a match with
+        .populate({
+          path: "userLiked",
+          select: "-_id name pictures token",
+        });
+        res.status(200).json({ result: true, data: user.myMessages });
+  } 
+  catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+
+
 module.exports = router;
