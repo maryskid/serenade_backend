@@ -588,7 +588,7 @@ router.post("/recommandations", async (req, res) => {
         whoLikesMe: 0,
         imaginaryName: 0,
       }
-    );
+    ).populate("myRelationships");
 
     // Get the array of likes and dislikes of our user for efficient filtering
     const userLikes = user.myLikes;
@@ -643,13 +643,11 @@ router.post("/recommandations", async (req, res) => {
       );
     });
 
-    return res
-      .status(200)
-      .json({
-        result: true,
-        total: userRecommandations.length,
-        recommendedUsers: userRecommandations,
-      });
+    return res.status(200).json({
+      result: true,
+      total: userRecommandations.length,
+      recommendedUsers: userRecommandations,
+    });
   } catch (error) {
     return res.status(500).json({ result: false, message: error.message });
   }
