@@ -10,6 +10,8 @@ const uid2 = require("uid2");
 const bcrypt = require("bcrypt");
 const { uploadUserPictures } = require("../modules/cloudinary");
 const Match = require("../models/Match");
+const haversine = require("haversine");
+const { differenceInYears } = require("date-fns");
 
 router.post("/signup", async (req, res) => {
   try {
@@ -566,6 +568,79 @@ router.put("/saveSearchSettings", (req, res) => {
     .catch((error) => {
       return res.status(500).json({ result: false, message: error.message });
     });
+});
+
+router.post("/recommandations", async (req, res) => {
+  try {
+    const userToken = req.body.userToken;
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "user not found" });
+    }
+
+    // Fetch necessary fields only using query projection
+    const allUsers = await User.find(
+      {},
+      {
+        myLikes: 1,
+        myDislikes: 1,
+        "location.latitude": 1,
+        "location.longitude": 1,
+        birthdate: 1,
+        gender: 1,
+        sexuality: 1,
+      }
+    );
+
+    // Get the array of likes and dislikes of our user for efficient filtering
+    const userLikes = user.myLikes;
+    const userDislikes = user.myDislikes;
+
+    // Filter users based on likes and dislikes of our user
+    const firstFilteredUsers = allUsers.filter((people) => {
+      return (
+        !userLikes.includes(people._id) && !userDislikes.includes(people._id)
+      );
+    });
+
+    // Get user's location coordinates
+    const userCoordinates = {
+      latitude: user.location.latitude,
+      longitude: user.location.longitude,
+    };
+
+    // For each of the filtered users, keep only those who fit the search criteria
+    const userRecommandations = firstFilteredUsers.filter((people) => {
+      const peopleCoordinates = {
+        latitude: people.location.latitude,
+        longitude: people.location.longitude,
+      };
+
+      // Calculate the distance between the two users using haversine
+      const distanceBetweenOurTwoUsersInKm =
+        haversine(peopleCoordinates, userCoordinates, { unit: "meter" }) / 1000;
+
+      // Get the age of each user in years
+      const peopleAge = differenceInYears(
+        new Date(),
+        new Date(people.birthdate)
+      );
+
+      return (
+        peopleAge > user.search.ageMin &&
+        peopleAge < user.search.ageMax &&
+        distanceBetweenOurTwoUsersInKm < user.search.maxDistance &&
+        people.gender === user.search.genderLiked &&
+        people.sexuality === user.search.sexualityLiked
+      );
+    });
+
+    return res
+      .status(200)
+      .json({ result: true, recommendedUsers: userRecommandations });
+  } catch (error) {
+    return res.status(500).json({ result: false, message: error.message });
+  }
 });
 
 module.exports = router;
