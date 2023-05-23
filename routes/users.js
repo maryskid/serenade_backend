@@ -476,4 +476,51 @@ router.post("/displayProfile", async (req, res) => {
   }
 });
 
+router.post("/updateProfile", async (req, res) => {
+  try {
+    const { userToken, birthdate, gender, sexuality, occupation, description } =
+      req.body;
+
+    const user = await User.findOne({ token: userToken });
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+
+    const updateObject = {};
+
+    if (gender) {
+      updateObject.gender = gender;
+    }
+    if (sexuality) {
+      updateObject.sexuality = sexuality;
+    }
+    if (occupation) {
+      updateObject.occupation = occupation;
+    }
+    if (description) {
+      updateObject.description = description;
+    }
+    if (birthdate) {
+      updateObject.birthdate = birthdate;
+    }
+    const updatedUser = await User.updateOne(
+      { token: userToken },
+      updateObject
+    );
+
+    if (updatedUser.modifiedCount !== 1) {
+      return res.status(400).json({
+        result: false,
+        message: "Error when updating profile",
+      });
+    }
+    return res.status(200).json({
+      result: true,
+      message: "Profile updated successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({ result: false, message: error.message });
+  }
+});
+
 module.exports = router;
