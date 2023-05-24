@@ -316,54 +316,49 @@ router.post("/action/like", async (req, res) => {
     if (!user) {
       return res.status(400).json({ result: false, message: "User not found" });
     }
-    const likedUser = await User.findOne({ token: likedUserToken });
 
+    const likedUser = await User.findOne({ token: likedUserToken });
     if (!likedUser) {
       return res
         .status(400)
         .json({ result: false, message: "Liked user not found" });
     }
 
-    const updateUserLikes = await User.updateOne(
-      { _id: user._id },
-      { $addToSet: { myLikes: likedUser._id } }
-    );
-
-    const updateLikedUserWhoLikesMe = await User.updateOne(
-      { _id: likedUser._id },
-      { $addToSet: { whoLikesMe: user._id } }
-    );
-
-    if (
-      updateUserLikes.modifiedCount !== 1 ||
-      updateLikedUserWhoLikesMe.modifiedCount !== 1
-    ) {
-      return res.status(400).json({
-        result: false,
-        message: "Error in the like action",
-      });
-    }
-
     if (user.whoLikesMe.includes(likedUser._id)) {
+      // Remove user from likes list and who likes me list
+      user.whoLikesMe = user.whoLikesMe.filter(
+        (id) => id.toString() !== likedUser._id.toString()
+      );
+      likedUser.myLikes = likedUser.myLikes.filter(
+        (id) => id.toString() !== user._id.toString()
+      );
+
       const newMatch = new Match({
-        user: {
-          id: user._id,
-          name: user.name,
-          pictures: user.pictures,
-          token: user.token,
-        },
-        userLiked: {
-          id: likedUser._id,
-          name: likedUser.name,
-          pictures: likedUser.pictures,
-          token: likedUser.token,
-        },
+        user: user._id,
+        userLiked: likedUser._id,
       });
 
       const matchData = await newMatch.save();
 
-      return res.status(200).json({ isAMatch: true, matchData });
+      // Populate the user and userLiked properties in the matchData
+      const populatedMatchData = await Match.populate(matchData, [
+        { path: "user", select: "name pictures" },
+        { path: "userLiked", select: "name pictures" },
+      ]);
+
+      await user.save();
+      await likedUser.save();
+
+      return res
+        .status(200)
+        .json({ isAMatch: true, matchData: populatedMatchData });
     }
+
+    user.myLikes.addToSet(likedUser._id);
+    likedUser.whoLikesMe.addToSet(user._id);
+
+    await user.save();
+    await likedUser.save();
 
     return res.status(200).json({ result: true, message: "Like done" });
   } catch (error) {
@@ -594,12 +589,40 @@ router.post("/recommandations", async (req, res) => {
     const userLikes = user.myLikes;
     const userDislikes = user.myDislikes;
 
-    // Filter users based on likes and dislikes of our user
+    const matches = await Match.find({
+      $or: [
+        { user: user._id }, // Matches where user ID is the given ID
+        { userLiked: user._id }, // Matches where userLiked ID is the given ID
+      ],
+    })
+      .populate({
+        path: "user",
+        select: "_id token",
+      })
+      .populate({
+        path: "userLiked",
+        select: "_id token",
+      });
+
+    // Other users who matched with our current user
+    const usermatches = matches
+      .map((match) => {
+        if (match.user && match.user.token !== userToken) {
+          return match.user;
+        } else if (match.userLiked && match.userLiked.token !== userToken) {
+          return match.userLiked;
+        }
+        return null; // To exclude the unmatched documents from the result
+      })
+      .filter(Boolean);
+
+    // Filter users based on likes and dislikes and matches of our user
     const firstFilteredUsers = allUsers.filter((people) => {
       return (
         !userLikes.includes(people._id) &&
         !userDislikes.includes(people._id) &&
-        people.token !== userToken
+        people.token !== userToken &&
+        !usermatches.some((match) => match._id.equals(people._id))
       );
     });
 
@@ -650,6 +673,37 @@ router.post("/recommandations", async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/matches", async (req, res) => {
+  try {
+    const { userToken } = req.body;
+
+    // Recherche l'utilisateur actuel en utilisant le token
+    const user = await User.findOne({ token: userToken });
+
+    if (!user) {
+      return res.status(404).json({ result: false, message: "User not found" });
+    }
+
+    const matches = await Match.find({
+      $or: [
+        { user: user._id }, // Matches where user ID is the given ID
+        { userLiked: user._id }, // Matches where userLiked ID is the given ID
+      ],
+    })
+      .populate({
+        path: "user",
+        select: "name pictures location birthdate gender token",
+      })
+      .populate({
+        path: "userLiked",
+        select: "name pictures location birthdate gender token",
+      });
+    res.json({ result: true, data: matches });
+  } catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
   }
 });
 

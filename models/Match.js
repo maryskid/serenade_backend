@@ -1,33 +1,15 @@
 const mongoose = require("mongoose");
 
 const messageSchema = mongoose.Schema({
-  sender: {
-    id: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
-    token: String,
-  },
-  receiver: {
-    id: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
-    token: String,
-  },
+  sender: String,
+  receiver: String,
   content: String,
   date: Date,
 });
 
 const matchSchema = mongoose.Schema({
-  user: {
-    id: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
-    name: String,
-    pictures: [String],
-    token: String,
-  },
-
-  userLiked: {
-    id: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
-    name: String,
-    pictures: [String],
-    token: String,
-  },
-
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+  userLiked: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   messages: [messageSchema],
 });
 
