@@ -324,6 +324,20 @@ router.post("/action/like", async (req, res) => {
         .json({ result: false, message: "Liked user not found" });
     }
 
+    const existingMatch = await Match.findOne({
+      $or: [
+        { user: user._id, userLiked: likedUser._id },
+        { user: likedUser._id, userLiked: user._id },
+      ],
+    });
+
+    if (existingMatch) {
+      // Match already exists, handle accordingly
+      return res
+        .status(400)
+        .json({ result: false, message: "Match already exists" });
+    }
+
     if (user.whoLikesMe.includes(likedUser._id)) {
       // Remove user from likes list and who likes me list
       user.whoLikesMe = user.whoLikesMe.filter(
@@ -342,8 +356,8 @@ router.post("/action/like", async (req, res) => {
 
       // Populate the user and userLiked properties in the matchData
       const populatedMatchData = await Match.populate(matchData, [
-        { path: "user", select: "name pictures" },
-        { path: "userLiked", select: "name pictures" },
+        { path: "user", select: "name pictures token" },
+        { path: "userLiked", select: "name pictures token" },
       ]);
 
       await user.save();
@@ -384,7 +398,10 @@ router.post("/action/dislike", async (req, res) => {
 
     const updateUserDislikes = await User.updateOne(
       { _id: user._id },
-      { $addToSet: { myDislikes: dislikedUser._id } }
+      {
+        $addToSet: { myDislikes: dislikedUser._id },
+        $pull: { whoLikesMe: dislikedUser._id },
+      }
     );
 
     if (updateUserDislikes.modifiedCount !== 1) {
@@ -458,11 +475,22 @@ router.post("/displayProfile", async (req, res) => {
     //find user by token and populate people who likes him/her and their partners
     const user = await User.findOne({ token: userToken })
       .populate({
-        path: "whoLikesMe myRelationships",
-        select: "-_id name location pictures birthdate gender token",
+        path: "whoLikesMe",
+        select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        populate: {
+          path: "myRelationships",
+          select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        },
+      })
+      .populate({
+        path: "myRelationships",
+        populate: {
+          path: "myRelationships",
+          select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        },
+        select: "-_id -password -myLikes -myDislikes -whoLikesMe",
       })
       .select("-_id -password -myLikes -myDislikes");
-
     // Check if user exists
     if (!user) {
       return res.status(400).json({ result: false, message: "User not found" });
@@ -684,7 +712,7 @@ router.post("/matches", async (req, res) => {
     const user = await User.findOne({ token: userToken });
 
     if (!user) {
-      return res.status(404).json({ result: false, message: "User not found" });
+      return res.status(400).json({ result: false, message: "User not found" });
     }
 
     const matches = await Match.find({
@@ -695,13 +723,54 @@ router.post("/matches", async (req, res) => {
     })
       .populate({
         path: "user",
-        select: "name pictures location birthdate gender token",
+        select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        populate: {
+          path: "myRelationships",
+          select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        },
       })
       .populate({
         path: "userLiked",
-        select: "name pictures location birthdate gender token",
+        select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        populate: {
+          path: "myRelationships",
+          select: "-_id -password -myLikes -myDislikes -whoLikesMe",
+        },
       });
-    res.json({ result: true, data: matches });
+    res.status(200).json({ result: true, data: matches });
+  } catch (error) {
+    return res.status(400).json({ result: false, message: error.message });
+  }
+});
+
+router.post("/newMessage", async (req, res) => {
+  try {
+    const { matchId, messageData } = req.body;
+
+    const user = await User.findOne({ token: messageData.sender });
+
+    if (!user) {
+      return res.status(400).json({ result: false, message: "User not found" });
+    }
+
+    const match = await Match.findById(matchId);
+
+    if (!match) {
+      return res
+        .status(400)
+        .json({ result: false, message: "Match not found" });
+    }
+
+    // Créer un nouveau message avec l'auteur correspondant au token de l'utilisateur
+    const newMessage = {
+      sender: messageData.sender,
+      content: messageData.content,
+      date: messageData.date,
+    };
+
+    match.messages.push(newMessage);
+    const savedMessage = await match.save();
+    return res.status(200).json({ result: true, savedMessage });
   } catch (error) {
     return res.status(400).json({ result: false, message: error.message });
   }
